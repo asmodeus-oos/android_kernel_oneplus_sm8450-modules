@@ -1167,17 +1167,24 @@ int oplus_ofp_hbm_handle(void *sde_encoder_virt)
 	bl_level = display->panel->bl_config.bl_level;
 	OFP_DEBUG("hbm_enable:%lu, bl_level=%u\n", hbm_enable, bl_level);
 
-	if ((!p_oplus_ofp_params->doze_active && (hbm_enable & OPLUS_OFP_PROPERTY_DIM_LAYER
-			|| hbm_enable & OPLUS_OFP_PROPERTY_FINGERPRESS_LAYER) && bl_level)
+	/*
+	 * Awake: require DIM_LAYER so panel HBM cannot race a FINGERPRESS-only
+	 * frame (full-screen flash before the compensation dim is composed).
+	 * Doze keeps FINGERPRESS-only; AOD dimming is handled separately.
+	 */
+	if ((!p_oplus_ofp_params->doze_active && (hbm_enable & OPLUS_OFP_PROPERTY_DIM_LAYER)
+			&& bl_level)
 				|| (p_oplus_ofp_params->doze_active && (hbm_enable & OPLUS_OFP_PROPERTY_FINGERPRESS_LAYER)
 					&& bl_level)) {
 		rc = oplus_ofp_set_panel_hbm(c_conn, true);
 		if (rc) {
 			OFP_ERR("failed to set panel hbm on\n");
 		}
-	} else if ((!(hbm_enable & OPLUS_OFP_PROPERTY_DIM_LAYER)
+	} else if ((p_oplus_ofp_params->doze_active
 					&& !(hbm_enable & OPLUS_OFP_PROPERTY_FINGERPRESS_LAYER))
-						|| !p_oplus_ofp_params->fp_press || !bl_level) {
+				|| (!p_oplus_ofp_params->doze_active
+					&& !(hbm_enable & OPLUS_OFP_PROPERTY_DIM_LAYER))
+				|| !bl_level) {
 		rc = oplus_ofp_set_panel_hbm(c_conn, false);
 		if (rc) {
 			OFP_ERR("failed to set panel hbm off\n");
